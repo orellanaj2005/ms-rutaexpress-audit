@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: ms-rutaexpress-audit
+
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:oracle:thin:@${DB_HOST:localhost}:${DB_PORT:1521}/${DB_SERVICE:FREEPDB1}
+    username: ${DB_USER:audit_user}
+    password: ${DB_PASSWORD:changeit}
+    driver-class-name: oracle.jdbc.OracleDriver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # el esquema lo maneja Flyway, JPA solo valida que calce
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ms-rutaexpress-audit
+
+server:
+  port: 8083
+
+security:
+  jwt:
+    issuer-uri: https://login.microsoftonline.com/${TENANT_ID}/v2.0
+    audience: ${API_CLIENT_ID}
+
+logging:
+  level:
+    cl.rutaexpress.audit: INFO
+    org.springframework.security: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
