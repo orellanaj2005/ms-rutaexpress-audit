@@ -23,7 +23,7 @@ DB_PORT=1521
 mvn spring-boot:run
 ```
 
-Requiere Oracle y Kafka accesibles (usa el `docker-compose` del repo `ms-rutaexpress-db` / `infra` de Javier).
+Requiere Oracle y Kafka accesibles (usa el `docker-compose` del repo `ms-rutaexpress-db` /).
 
 ## Endpoints
 
