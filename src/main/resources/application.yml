@@ -24,10 +24,28 @@ spring:
     baseline-on-migrate: true
     locations: classpath:db/migration
 
+  rabbitmq:
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: ms-rutaexpress-audit
+
+rutaexpress:
+  rabbitmq:
+    exchanges:
+      dead-letter: cmd.dead.dlx
+    email:
+      routing-key: email.send
+    warehouse:
+      routing-key: warehouse.ticket
+    label:
+      routing-key: label.gen
+    audit:
+      dead-letter-queue: q.audit.deadletter
 
 server:
   port: 8083
