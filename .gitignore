@@ -5,3 +5,8 @@ target/
 application-local.yml
 application-local.properties
 .env
+
+### Comunes a los 12 repositorios de RutaExpress ###
+node_modules/
+bin/
+.vscode/
