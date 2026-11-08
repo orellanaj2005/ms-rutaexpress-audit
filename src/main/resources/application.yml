@@ -35,6 +35,9 @@ spring:
       group-id: ms-rutaexpress-audit
 
 rutaexpress:
+  kafka:
+    dlt-topic: audit.DLT
+    concurrency: 3
   rabbitmq:
     exchanges:
       dead-letter: cmd.dead.dlx
@@ -56,6 +59,8 @@ security:
     audience: ${API_CLIENT_ID}
 
 logging:
+  pattern:
+    level: "%5p [traceId=%X{traceId:-} eventId=%X{eventId:-} %X{topic:-}-%X{partition:-}@%X{offset:-}]"
   level:
     cl.rutaexpress.audit: INFO
     org.springframework.security: WARN
