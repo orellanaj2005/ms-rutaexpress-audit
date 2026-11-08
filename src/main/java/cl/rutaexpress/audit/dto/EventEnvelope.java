@@ -1,76 +1,34 @@
 package cl.rutaexpress.audit.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
 
 /**
- * Contrato común acordado con el equipo (punto de sincronización #3 del reparto
- * de carga de trabajo) para todos los eventos publicados en Kafka/RabbitMQ:
- * type, eventId, timestamp, traceId, correlationId + payload propio del dominio.
+ * Envelope común de todos los eventos Kafka (plan Kafka, sección 3):
+ * eventId, type, version, aggregateId (también es la key del mensaje), timestamp ISO-8601,
+ * traceId / correlationId, producer y payload propio del tipo de evento.
  *
- * Si el envelope real que arma Jassack en "shipments" difiere en algún nombre
- * de campo, ajusta este DTO — es el único lugar que hay que tocar.
+ * El payload se deja como JsonNode y se convierte a su record tipado según {@code type}
+ * (ver EventValidator#payload). Así un tipo desconocido o nuevo no rompe la deserialización
+ * del envelope completo.
+ *
+ * Obligatorios: eventId, type, timestamp, payload. El resto es opcional para no mandar a la
+ * DLT eventos válidos de un productor que todavía no los llena.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class EventEnvelope {
-
-    private String type;
-    private String eventId;
-    private Instant timestamp;
-    private String traceId;
-    private String correlationId;
-    private JsonNode payload;
-
-    public EventEnvelope() {
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public String getEventId() {
-        return eventId;
-    }
-
-    public void setEventId(String eventId) {
-        this.eventId = eventId;
-    }
-
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(Instant timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public String getTraceId() {
-        return traceId;
-    }
-
-    public void setTraceId(String traceId) {
-        this.traceId = traceId;
-    }
-
-    public String getCorrelationId() {
-        return correlationId;
-    }
-
-    public void setCorrelationId(String correlationId) {
-        this.correlationId = correlationId;
-    }
-
-    public JsonNode getPayload() {
-        return payload;
-    }
-
-    public void setPayload(JsonNode payload) {
-        this.payload = payload;
-    }
+public record EventEnvelope(
+        @NotBlank String eventId,
+        @NotBlank String type,
+        Integer version,
+        String aggregateId,
+        @NotNull Instant timestamp,
+        String traceId,
+        String correlationId,
+        String producer,
+        @NotNull JsonNode payload
+) {
 }

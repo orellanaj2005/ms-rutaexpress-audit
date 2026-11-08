@@ -1,34 +1,32 @@
 package cl.rutaexpress.audit.kafka;
 
-import cl.rutaexpress.audit.domain.AuditEvent;
 import cl.rutaexpress.audit.dto.EventEnvelope;
-import cl.rutaexpress.audit.repository.AuditEventRepository;
-import com.fasterxml.jackson.databind.JsonNode;
+import cl.rutaexpress.audit.service.AuditTimelineService;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Consume shipments.events y audit.timeline (ver Caso 3, sección 9, y el
- * reparto de carga de trabajo: "Consume audit.timeline y probablemente
- * también shipments.events para nutrir el timeline").
+ * Consume shipments.events y audit.timeline. Solo recibe, deja el contexto de log (MDC),
+ * delega en {@link AuditTimelineService} y hace ack.
  *
- * ACK manual + idempotencia por eventId, mismo criterio que notify aplicó
- * para RabbitMQ, para no duplicar filas si Kafka reentrega un mensaje.
+ * Si el servicio lanza una excepción NO se hace ack: el error handler (KafkaConsumerConfig)
+ * decide si reintenta (errores transitorios) o manda directo a audit.DLT (evento inválido).
  */
 @Component
 public class AuditEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(AuditEventConsumer.class);
 
-    private final AuditEventRepository repository;
+    private final AuditTimelineService service;
 
-    public AuditEventConsumer(AuditEventRepository repository) {
-        this.repository = repository;
+    public AuditEventConsumer(AuditTimelineService service) {
+        this.service = service;
     }
 
     @KafkaListener(
@@ -36,59 +34,33 @@ public class AuditEventConsumer {
             groupId = "${spring.kafka.consumer.group-id}",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    @Transactional
-    public void onMessage(EventEnvelope envelope, Acknowledgment ack,
-                           org.apache.kafka.clients.consumer.ConsumerRecord<String, EventEnvelope> record) {
+    public void onMessage(ConsumerRecord<String, EventEnvelope> record, Acknowledgment ack) {
+        EventEnvelope envelope = record.value();
+        putMdc(record, envelope);
         try {
-            if (envelope.getEventId() == null) {
-                log.warn("Evento sin eventId en tópico {}, se descarta: {}", record.topic(), envelope.getType());
-                ack.acknowledge();
-                return;
-            }
-
-            if (repository.existsByEventId(envelope.getEventId())) {
-                log.info("Evento {} ya procesado (dedup), se ignora", envelope.getEventId());
-                ack.acknowledge();
-                return;
-            }
-
-            JsonNode payload = envelope.getPayload();
-            String shipmentId = extractText(payload, "shipmentId");
-            String actor = extractText(payload, "actor");
-            if (actor == null) {
-                actor = extractText(payload, "userId");
-            }
-
-            AuditEvent entity = new AuditEvent(
-                    envelope.getEventId(),
-                    envelope.getType(),
-                    record.topic(),
-                    shipmentId,
-                    actor,
-                    envelope.getTimestamp() != null ? envelope.getTimestamp() : java.time.Instant.now(),
-                    envelope.getTraceId(),
-                    envelope.getCorrelationId(),
-                    payload != null ? payload.toString() : null
-            );
-
-            repository.save(entity);
+            AuditTimelineService.Result result = service.record(envelope, record.topic());
+            log.info("Evento {} tipo={} -> {}", envelope.eventId(), envelope.type(), result);
             ack.acknowledge();
         } catch (DataIntegrityViolationException dup) {
-            // Carrera entre dos particiones/instancias con el mismo eventId: no es un error real.
-            log.info("Evento {} ya existía (constraint UQ_AUDIT_EVENT_ID), se ignora", envelope.getEventId());
+            // Carrera entre dos hilos/instancias con el mismo eventId (UQ_AUDIT_EVENT_ID): no es un error real.
+            log.info("Evento {} ya existía (constraint única), se ignora", envelope.eventId());
             ack.acknowledge();
-        } catch (Exception ex) {
-            log.error("Error procesando evento {} del tópico {}: {}", envelope.getEventId(), record.topic(), ex.getMessage(), ex);
-            // No se hace ack(): el listener container reintenta según su back-off configurado
-            // y, tras agotar intentos, el error handler lo enviará al *.DLT correspondiente.
-            throw ex;
+        } finally {
+            MDC.clear();
         }
     }
 
-    private String extractText(JsonNode payload, String field) {
-        if (payload == null || !payload.hasNonNull(field)) {
-            return null;
+    private static void putMdc(ConsumerRecord<String, EventEnvelope> record, EventEnvelope envelope) {
+        MDC.put("topic", record.topic());
+        MDC.put("partition", String.valueOf(record.partition()));
+        MDC.put("offset", String.valueOf(record.offset()));
+        if (envelope != null) {
+            if (envelope.eventId() != null) {
+                MDC.put("eventId", envelope.eventId());
+            }
+            if (envelope.traceId() != null) {
+                MDC.put("traceId", envelope.traceId());
+            }
         }
-        return payload.get(field).asText();
     }
 }
