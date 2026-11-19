@@ -1,5 +1,6 @@
 package cl.rutaexpress.audit.dto.payload;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
 
@@ -8,8 +9,6 @@ import jakarta.validation.constraints.NotBlank;
 public record ShipmentCreatedPayload(
         @NotBlank String shipmentId,
         String serviceType,
-        String userId
+        @JsonAlias("userId") String createdBy
 ) {
 }
-
-

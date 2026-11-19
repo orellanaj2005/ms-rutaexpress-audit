@@ -1,5 +1,6 @@
 package cl.rutaexpress.audit.dto.payload;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
 
@@ -9,8 +10,6 @@ public record ShipmentStatusChangedPayload(
         @NotBlank String shipmentId,
         @NotBlank String status,
         String previousStatus,
-        String actor
+        @JsonAlias("actor") String changedBy
 ) {
 }
-
-

@@ -52,12 +52,12 @@ public class AuditTimelineService {
             case EventTypes.SHIPMENT_CREATED -> {
                 ShipmentCreatedPayload p = validator.payload(envelope, ShipmentCreatedPayload.class);
                 shipmentId = p.shipmentId();
-                actor = p.userId();
+                actor = p.createdBy();
             }
             case EventTypes.SHIPMENT_STATUS_CHANGED -> {
                 ShipmentStatusChangedPayload p = validator.payload(envelope, ShipmentStatusChangedPayload.class);
                 shipmentId = p.shipmentId();
-                actor = p.actor();
+                actor = p.changedBy();
             }
             case EventTypes.AUDIT_ACTION -> {
                 AuditActionPayload p = validator.payload(envelope, AuditActionPayload.class);
